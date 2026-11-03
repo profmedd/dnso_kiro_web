@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lista de Tareas</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --surface-hover: #2a2a2a;
+      --text: #e0e0e0;
+      --text-muted: #9a9a9a;
+      --accent: #4a9eff;
+      --accent-hover: #3a8eef;
+      --danger: #e05555;
+      --border: #333333;
+      --done: #5c8a5c;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 540px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      text-align: center;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    #taskInput {
+      flex: 1;
+      padding: 0.7rem 0.85rem;
+      background-color: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    #taskInput:focus {
+      border-color: var(--accent);
+    }
+
+    #addBtn {
+      padding: 0.7rem 1.2rem;
+      background-color: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    #addBtn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .filters {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .filter-btn {
+      padding: 0.35rem 0.75rem;
+      background-color: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-btn:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+
+    .filter-btn.active {
+      background-color: var(--surface);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    ul {
+      list-style: none;
+    }
+
+    .task {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0.9rem;
+      background-color: var(--surface);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      transition: background-color 0.15s ease;
+    }
+
+    .task:hover {
+      background-color: var(--surface-hover);
+    }
+
+    .task input[type="checkbox"] {
+      width: 1.15rem;
+      height: 1.15rem;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .task-text {
+      flex: 1;
+      font-size: 1rem;
+      word-break: break-word;
+    }
+
+    .task.done .task-text {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    .del-btn {
+      background-color: transparent;
+      color: var(--text-muted);
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0.15rem 0.35rem;
+      border-radius: 5px;
+      transition: color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .del-btn:hover {
+      color: var(--danger);
+      background-color: rgba(224, 85, 85, 0.12);
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 2rem 0;
+      font-size: 0.95rem;
+    }
+
+    .count {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Lista de Tareas</h1>
+    <div class="input-row">
+      <input type="text" id="taskInput" placeholder="Escribe una tarea..." autofocus />
+      <button id="addBtn">Añadir</button>
+    </div>
+    <div class="filters">
+      <button class="filter-btn active" data-filter="all">Todas</button>
+      <button class="filter-btn" data-filter="active">Pendientes</button>
+      <button class="filter-btn" data-filter="done">Completadas</button>
+    </div>
+    <ul id="taskList"></ul>
+    <p class="empty" id="emptyMsg">No hay tareas todavía.</p>
+    <p class="count" id="count"></p>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "dnso_kiro_web_tareas";
+    let tasks = [];
+    let currentFilter = "all";
+
+    // Cargar tareas guardadas al iniciar
+    function loadTasks() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      tasks = saved ? JSON.parse(saved) : [];
+    }
+
+    // Guardar tareas en el navegador
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    // Renderizar la lista según el filtro activo
+    function render() {
+      const list = document.getElementById("taskList");
+      const emptyMsg = document.getElementById("emptyMsg");
+      const count = document.getElementById("count");
+      list.innerHTML = "";
+
+      const visible = tasks.filter(function (t) {
+        if (currentFilter === "active") return !t.done;
+        if (currentFilter === "done") return t.done;
+        return true;
+      });
+
+      if (visible.length === 0) {
+        emptyMsg.style.display = "block";
+      } else {
+        emptyMsg.style.display = "none";
+      }
+
+      visible.forEach(function (task) {
+        const li = document.createElement("li");
+        li.className = "task" + (task.done ? " done" : "");
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = task.done;
+        checkbox.addEventListener("change", function () {
+          toggleTask(task.id);
+        });
+
+        const span = document.createElement("span");
+        span.className = "task-text";
+        span.textContent = task.text;
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "del-btn";
+        delBtn.textContent = "✕";
+        delBtn.title = "Eliminar";
+        delBtn.addEventListener("click", function () {
+          deleteTask(task.id);
+        });
+
+        li.appendChild(checkbox);
+        li.appendChild(span);
+        li.appendChild(delBtn);
+        list.appendChild(li);
+      });
+
+      const remaining = tasks.filter(function (t) { return !t.done; }).length;
+      count.textContent = tasks.length > 0
+        ? remaining + " pendiente(s) de " + tasks.length
+        : "";
+    }
+
+    // Añadir una nueva tarea
+    function addTask() {
+      const input = document.getElementById("taskInput");
+      const text = input.value.trim();
+      if (text === "") return;
+      tasks.push({ id: Date.now(), text: text, done: false });
+      saveTasks();
+      input.value = "";
+      render();
+    }
+
+    // Marcar/desmarcar como completada
+    function toggleTask(id) {
+      const task = tasks.find(function (t) { return t.id === id; });
+      if (task) {
+        task.done = !task.done;
+        saveTasks();
+        render();
+      }
+    }
+
+    // Eliminar una tarea
+    function deleteTask(id) {
+      tasks = tasks.filter(function (t) { return t.id !== id; });
+      saveTasks();
+      render();
+    }
+
+    // Eventos
+    document.getElementById("addBtn").addEventListener("click", addTask);
+    document.getElementById("taskInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") addTask();
+    });
+
+    document.querySelectorAll(".filter-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelector(".filter-btn.active").classList.remove("active");
+        btn.classList.add("active");
+        currentFilter = btn.dataset.filter;
+        render();
+      });
+    });
+
+    // Inicio
+    loadTasks();
+    render();
+  </script>
+</body>
+</html>
